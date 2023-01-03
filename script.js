@@ -1,12 +1,10 @@
-//global variables for search button and cities array for localStorage
+//global variables
 var searchBtn = $("#search");
 var cities = [];
 
-//on document load, render past cities searched
 $(document).ready(renderCity());
 
-//user searches for a city, upon click of spyglass use AJAX to query that city from weather API, city saves in localStorage, findWeather function runs
-//upon refresh, any cities in localStorage persist/append to unordered list (id: past-cities), need to create <li class="list-group-item"> for each
+//search for city and ajax query's the city from api
 $(searchBtn).on("click", (event) => {
   event.preventDefault();
   $("#current-weather-card").empty();
@@ -22,13 +20,12 @@ $(searchBtn).on("click", (event) => {
   $("#search-city").val("");
 });
 
-//function to set cityInput to localStorage, adding it to the cities array
+//function to set cityInput to localStorage, adding to array
 function storeCity(cityInput) {
   cities.push(cityInput);
   localStorage.setItem("cities", JSON.stringify([...cities]));
 }
 
-//function to render past cities searched
 function renderCity() {
   var cityDiv = $("#past-cities");
   $(cityDiv).empty();
@@ -38,11 +35,10 @@ function renderCity() {
   });
 }
 
-//today's forecast populates to the forecast-today div (card), 5-day forecast populates to the forecast-future(cards)
 //defining global variable apiKey
 var apiKey = "f208f3c155c74e66a18454aaa1a88a86";
 
-//function to get current weather info
+//get current weather info
 function findWeather(cityInput) {
   var queryUrl =
     "https://api.openweathermap.org/data/2.5/weather?q=" +
