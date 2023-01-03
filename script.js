@@ -1,156 +1,174 @@
-localStorage.clear();
+//global variables for search button and cities array for localStorage
+var searchBtn = $("#search");
+var cities = [];
 
-function findCity() {
-  var cityName = titleCase($("#cityName")[0].value.trim());
+//on document load, render past cities searched
+$(document).ready(renderCity());
 
-  var apiURL =
-    "https://api.openweathermap.org/data/2.5/weather?q=" +
-    cityName +
-    "&units=imperial&appid=f208f3c155c74e66a18454aaa1a88a86";
-
-  fetch(apiURL).then(function (response) {
-    if (response.ok) {
-      response.json().then(function (data) {
-        $("#city-name")[0].textContent =
-          cityName + " (" + moment().format("M/D/YYYY") + ")";
-
-        $("#city-list").append(
-          '<button type="button" class="list-group-item list-group-item-light list-group-item-action city-name">' +
-            cityName
-        );
-
-        const lat = data.coord.lat;
-        const lon = data.coord.lon;
-
-        var latLonPair = lat.toString() + " " + lon.toString();
-
-        localStorage.setItem(cityName, latLonPair);
-
-        apiURL =
-          "https://api.openweathermap.org/data/2.5/onecall?lat=" +
-          lat +
-          "&lon=" +
-          lon +
-          "&exclude=minutely,hourly&units=imperial&appid=f208f3c155c74e66a18454aaa1a88a86";
-
-        fetch(apiURL).then(function (newResponse) {
-          if (newResponse.ok) {
-            newResponse.json().then(function (newData) {
-              getCurrentWeather(newData);
-            });
-          }
-        });
-      });
-    } else {
-      alert("Cannot find city!");
-    }
-  });
-}
-
-// This function gets the info for a city already in the list. It does not need to check whether the city exists as it was already checked when the city was first searched for.
-function getListCity(coordinates) {
-  apiURL =
-    "https://api.openweathermap.org/data/2.5/onecall?lat=" +
-    coordinates[0] +
-    "&lon=" +
-    coordinates[1] +
-    "&exclude=minutely,hourly&units=imperial&appid=f208f3c155c74e66a18454aaa1a88a86";
-
-  fetch(apiURL).then(function (response) {
-    if (response.ok) {
-      response.json().then(function (data) {
-        getCurrentWeather(data);
-      });
-    }
-  });
-}
-
-function getCurrentWeather(data) {
-  $(".results-panel").addClass("visible");
-
-  $("#currentIcon")[0].src =
-    "http://openweathermap.org/img/wn/" +
-    data.current.weather[0].icon +
-    "@2x.png";
-  $("#temperature")[0].textContent =
-    "Temperature: " + data.current.temp.toFixed(1) + " \u2109";
-  $("#humidity")[0].textContent = "Humidity: " + data.current.humidity + "% ";
-  $("#wind-speed")[0].textContent =
-    "Wind Speed: " + data.current.wind_speed.toFixed(1) + " MPH";
-  $("#uv-index")[0].textContent = "  " + data.current.uvi;
-
-  if (data.current.uvi < 3) {
-    $("#uv-index").removeClass("moderate severe");
-    $("#uv-index").addClass("favorable");
-  } else if (data.current.uvi < 6) {
-    $("#uv-index").removeClass("favorable severe");
-    $("#uv-index").addClass("moderate");
-  } else {
-    $("#uv-index").removeClass("favorable moderate");
-    $("#uv-index").addClass("severe");
+//user searches for a city, upon click of spyglass use AJAX to query that city from weather API, city saves in localStorage, findWeather function runs
+//upon refresh, any cities in localStorage persist/append to unordered list (id: past-cities), need to create <li class="list-group-item"> for each
+$(searchBtn).on("click", (event) => {
+  event.preventDefault();
+  $("#current-weather-card").empty();
+  $("#forecast-future").empty();
+  var cityInput = $("#search-city").val();
+  if (cityInput === "") {
+    return;
   }
-
-  getFutureWeather(data);
-}
-
-function getFutureWeather(data) {
-  for (var i = 0; i < 5; i++) {
-    var futureWeather = {
-      date: convertUnixTime(data, i),
-      icon:
-        "http://openweathermap.org/img/wn/" +
-        data.daily[i + 1].weather[0].icon +
-        "@2x.png",
-      temp: data.daily[i + 1].temp.day.toFixed(1),
-      humidity: data.daily[i + 1].humidity,
-    };
-
-    var currentSelector = "#day-" + i;
-    $(currentSelector)[0].textContent = futureWeather.date;
-    currentSelector = "#img-" + i;
-    $(currentSelector)[0].src = futureWeather.icon;
-    currentSelector = "#temp-" + i;
-    $(currentSelector)[0].textContent =
-      "Temp: " + futureWeather.temp + " \u2109";
-    currentSelector = "#hum-" + i;
-    $(currentSelector)[0].textContent =
-      "Humidity: " + futureWeather.humidity + "%";
-  }
-}
-
-// This function applies title case to a city name if there is more than one word.
-function titleCase(city) {
-  var updatedCity = city.toLowerCase().split(" ");
-  var returnedCity = "";
-  for (var i = 0; i < updatedCity.length; i++) {
-    updatedCity[i] = updatedCity[i][0].toUpperCase() + updatedCity[i].slice(1);
-    returnedCity += " " + updatedCity[i];
-  }
-  return returnedCity;
-}
-
-// This converts the UNIX time that is received from the server.
-function convertUnixTime(data, index) {
-  const dateObject = new Date(data.daily[index + 1].dt * 1000);
-
-  return dateObject.toLocaleDateString();
-}
-
-$("#search-button").on("click", function (e) {
-  e.preventDefault();
-
-  findCity();
-
-  $("form")[0].reset();
+  storeCity(cityInput);
+  findWeather(cityInput);
+  futureWeather(cityInput);
+  renderCity();
+  $("#search-city").val("");
 });
 
-$(".city-list-box").on("click", ".city-name", function () {
-  var coordinates = localStorage.getItem($(this)[0].textContent).split(" ");
-  coordinates[0] = parseFloat(coordinates[0]);
-  coordinates[1] = parseFloat(coordinates[1]);
+//function to set cityInput to localStorage, adding it to the cities array
+function storeCity(cityInput) {
+  cities.push(cityInput);
+  localStorage.setItem("cities", JSON.stringify([...cities]));
+}
 
-  $("#city-name")[0].textContent =
-    $(this)[0].textContent + " (" + moment().format("M/D/YYYY") + ")";
+//function to render past cities searched
+function renderCity() {
+  var cityDiv = $("#past-cities");
+  $(cityDiv).empty();
+  $.each(JSON.parse(localStorage.getItem("cities")), function (i, city) {
+    var newCity = $("<li>" + city + "</li>");
+    newCity.addClass("list-group-item").appendTo(cityDiv);
+  });
+}
 
-  getListCity(coordinates);
+//today's forecast populates to the forecast-today div (card), 5-day forecast populates to the forecast-future(cards)
+//defining global variable apiKey
+var apiKey = "f208f3c155c74e66a18454aaa1a88a86";
+
+//function to get current weather info
+function findWeather(cityInput) {
+  var queryUrl =
+    "https://api.openweathermap.org/data/2.5/weather?q=" +
+    cityInput +
+    "&APPID=" +
+    apiKey;
+  $.ajax({
+    url: queryUrl,
+    method: "GET",
+  }).then(function (response) {
+    console.log(response);
+    continueFindingWeather(response);
+  });
+}
+
+function continueFindingWeather(response) {
+  var queryUrl2 =
+    "https://api.openweathermap.org/data/2.5/onecall?lat=" +
+    response.coord.lat +
+    "&lon=" +
+    response.coord.lon +
+    "&APPID=" +
+    apiKey +
+    "&units=imperial";
+  $.ajax({
+    url: queryUrl2,
+    method: "GET",
+  }).then(function (response2) {
+    renderWeather(response2, response.name);
+  });
+}
+
+function renderWeather(response2, cityInput) {
+  var currentDate = $(
+    "<h2>" + cityInput + " (" + moment().format("M/D/YYYY") + ")" + "<h2>"
+  );
+  var currentTemp = $(
+    "<div>" + "Temperature: " + response2.current.temp + " &deg;F" + "</div>"
+  );
+  var currentHumidity = $(
+    "<div>" + "Humidity: " + response2.current.humidity + "%" + "</div>"
+  );
+  var currentWind = $(
+    "<div>" + "Wind Speed: " + response2.current.wind_speed + " mph" + "</div>"
+  );
+  var currentUvi = $(
+    "<div>" +
+      "UV Index: " +
+      "<span>" +
+      response2.current.uvi +
+      "</span>" +
+      "</div>"
+  );
+  var currentIcon = response2.current.weather[0].icon;
+  var weatherIcon = $("<img>").attr(
+    "src",
+    "https://openweathermap.org/img/wn/" + currentIcon + "@2x.png"
+  );
+  $("#forecast-today").removeClass("d-none");
+  $(currentDate).addClass("card-title").appendTo("#current-weather-card");
+  $(weatherIcon).appendTo("#current-weather-card");
+  $(currentTemp).addClass("card-text").appendTo("#current-weather-card");
+  $(currentHumidity).addClass("card-text").appendTo("#current-weather-card");
+  $(currentWind).addClass("card-text").appendTo("#current-weather-card");
+  $(currentUvi).addClass("card-text").appendTo("#current-weather-card");
+  if (response2.current.uvi < 4) {
+    $("span").addClass("badge badge-success");
+  }
+  if (response2.current.uvi >= 4 && response2.current.uvi < 7) {
+    $("span").addClass("badge badge-warning");
+  }
+  if (response2.current.uvi > 7) {
+    $("span").addClass("badge badge-danger");
+  }
+}
+
+//function to get future weather info
+
+function futureWeather(cityInput) {
+  var queryUrl =
+    "https://api.openweathermap.org/data/2.5/forecast?q=" +
+    cityInput +
+    "&APPID=" +
+    apiKey +
+    "&units=imperial";
+  $.ajax({
+    url: queryUrl,
+    method: "GET",
+  }).then(function (response) {
+    for (i = 7; i < response.list.length; i += 8) {
+      var futureDate = $(
+        "<h5>" + moment.unix(response.list[i].dt).format("M/D/YYYY") + "</h5>"
+      );
+      var futureTemp = $(
+        "<div>" + "Temp: " + response.list[i].main.temp + " &deg;F" + "</div>"
+      );
+      var futureHumidity = $(
+        "<div>" + "Humidity: " + response.list[i].main.humidity + "%" + "</div>"
+      );
+      var futureIcon = response.list[i].weather[0].icon;
+      var futureWeatherIcon = $("<img>").attr(
+        "src",
+        "https://openweathermap.org/img/wn/" + futureIcon + "@2x.png"
+      );
+      var newCard = $("<div>").addClass("card").appendTo("#forecast-future");
+      var newCardBody = $("<div>").addClass("card-body").appendTo(newCard);
+      $(futureDate).addClass("card-title").appendTo(newCardBody);
+      $(futureWeatherIcon).appendTo(newCardBody);
+      $(futureTemp).addClass("card-text").appendTo(newCardBody);
+      $(futureHumidity).addClass("card-text").appendTo(newCardBody);
+    }
+  });
+}
+
+//onclick function so that when user clicks a past-searched city, that current and future forecasts appear
+$(document).on("click", ".list-group-item", function (event) {
+  $("#current-weather-card").empty();
+  $("#forecast-future").empty();
+  findWeather(event.target.innerHTML);
+  futureWeather(event.target.innerHTML);
+});
+
+//upon refresh, last searched city's forecast-today and forecast-future persists
+$(document).ready(function () {
+  var cities = JSON.parse(localStorage.getItem("cities"));
+  var lastCity = cities[cities.length - 1];
+  findWeather(lastCity);
+  futureWeather(lastCity);
 });
