@@ -153,7 +153,6 @@ function futureWeather(cityInput) {
   });
 }
 
-//onclick function so that when user clicks a past-searched city, that current and future forecasts appear
 $(document).on("click", ".list-group-item", function (event) {
   $("#current-weather-card").empty();
   $("#forecast-future").empty();
@@ -161,7 +160,7 @@ $(document).on("click", ".list-group-item", function (event) {
   futureWeather(event.target.innerHTML);
 });
 
-//upon refresh, last searched city's forecast-today and forecast-future persists
+
 $(document).ready(function () {
   var cities = JSON.parse(localStorage.getItem("cities"));
   var lastCity = cities[cities.length - 1];
